@@ -1,3 +1,6 @@
+from Tkinter import *
+import tkFont
+
 import random
 
 BLANK=0
@@ -7,19 +10,155 @@ WIN=0
 LOST=1
 ON_GOING=2
 
+class MainApp(Tk):
+    """
+    The GUI
+    """
+    def __init__(self, *args, **kwargs):
+        Tk.__init__(self, *args, **kwargs)
+
+        self.settings_frame=Frame(self)
+        self.game_frame=Frame(self)
+        
+        self.settings_frame.grid()
+        self.game_frame.grid()
+
+        self.nrow=9
+        self.ncol=9
+        self.nbomb=10
+
+        self.game=GameClass(self.nrow, self.ncol, self.nbomb)
+
+        self.nrowLabel=Label(self.settings_frame, text="Rows: ")
+        self.nrowLabel.grid(column=0, row=0)
+
+        self.nrowEntryVar=StringVar()
+        self.nrowEntry=Entry(self.settings_frame, width=3, textvariable=self.nrowEntryVar)
+        self.nrowEntry.grid(column=1, row=0)
+        self.nrowEntryVar.set(str(self.nrow))
+
+
+        self.ncolLabel=Label(self.settings_frame, text="Columns: ")
+        self.ncolLabel.grid(column=2, row=0)
+
+        self.ncolEntryVar=StringVar()
+        self.ncolEntry=Entry(self.settings_frame, width=3, textvariable=self.ncolEntryVar)
+        self.ncolEntry.grid(column=3, row=0)
+        self.ncolEntryVar.set(str(self.ncol))
+
+
+        self.nbombLabel=Label(self.settings_frame, text="Bombs : ")
+        self.nbombLabel.grid(column=4, row=0)
+
+        self.nbombEntryVar=StringVar()
+        self.nbombEntry=Entry(self.settings_frame, width=3, textvariable=self.nbombEntryVar)
+        self.nbombEntry.grid(column=5, row=0)
+        self.nbombEntryVar.set(str(self.nbomb))
+
+        action=lambda: self.newGame()
+        self.newGameButton=Button(self.settings_frame, text="New Game", command=action)
+        self.newGameButton.grid(column=6, row=0)
+
+        self.createField()
+
+    def destroyField(self):
+        """
+        Destroys the buttons representing the minefield as well as the text field displaying the result of the game.
+        """
+        button_rows=len(self.buttons)
+        button_cols=len(self.buttons[0])
+        for row in range(button_rows):
+            for col in range(button_cols):
+                self.buttons[row][col].destroy()
+
+        self.gameStateLabel.destroy()
+
+    def createField(self):
+        """
+        Creates the buttons representing the minefield as well as the text field displaying the result of the game.
+        """
+        self.buttons=[['?' for col in range(self.ncol)] for row in range(self.nrow)]
+        self.btn_text=[['?' for col in range(self.ncol)] for row in range(self.nrow)]
+        
+        w=1
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                self.btn_text[row][col]=StringVar()
+                action=lambda x=row, y=col: self.onButtonClick(x, y)
+                self.buttons[row][col]=Button(self.game_frame, textvariable=self.btn_text[row][col], width=w, command=action)
+                self.buttons[row][col].grid(column=col, row=row)
+
+        resultFont=tkFont.Font(family='Helvetica', size=18, weight='bold')
+
+        self.gameStateLabelVar=StringVar()
+        self.gameStateLabel=Label(self.game_frame, textvariable=self.gameStateLabelVar, font=resultFont)
+        self.gameStateLabel.grid(column=0, row=self.nrow, columnspan=self.ncol)
+        self.gameStateLabelVar.set("")
+        
+
+    def newGame(self):
+        """
+        Starts a new game. First checks if the settings are valid, then destroys the old game and then creates a new game.
+        """
+        tempRow=int(self.nrowEntryVar.get())
+        tempCol=int(self.ncolEntryVar.get())
+        tempBomb=int(self.nbombEntryVar.get())
+
+        if checkIfValidGame(tempRow, tempCol, tempBomb):
+            self.nrow=tempRow
+            self.ncol=tempCol
+            self.nbomb=tempBomb
+            self.game=GameClass(self.nrow, self.ncol, self.nbomb)
+            self.destroyField()
+            self.createField()
+            self.updateDisplay()
+        else:
+            self.gameStateLabelVar.set("INVALID\nSETTINGS!")
+
+    def onButtonClick(self, row, col):
+        """
+        The minefield is represented by a grid of buttons. The game is played by pressing the buttons.
+        """
+        if self.game.nhidden==self.nrow*self.ncol: #Is this the first move
+            self.game.makeRandomBoard(row, col)
+
+        if self.game.result==ON_GOING:
+            result=self.game.makeMove(row, col)
+            self.updateDisplay()
+
+        if result==LOST:
+            self.gameStateLabelVar.set("YOU LOST!")
+        if result==WIN:
+            self.gameStateLabelVar.set("YOU WON!")
+
+    def updateDisplay(self):
+        """
+        Updates the display of the minefield after a cell has been selected.
+        """
+        for row in range(self.nrow):
+            for col in range(self.ncol):
+                if self.game.hidden[row][col]:
+                    if not (self.game.result==ON_GOING or self.game.board[row][col]==BLANK):
+                        self.btn_text[row][col].set("*")
+                    else:
+                        self.btn_text[row][col].set(" ")
+                else:
+                    self.btn_text[row][col].set(str(self.game.neighbors[row][col]))
+
 class GameClass:
-    def __init__(self, nrow, col, nbomb):
+    def __init__(self, nrow, ncol, nbomb):
         self.nbomb=nbomb
         self.board=['?']*nrow
         self.neighbors=['?']*nrow
         self.hidden=['?']*nrow
         self.result=ON_GOING
         self.nhidden=nrow*ncol
-        self.checkIfValidSettings()
         for row in range(nrow):
             self.board[row]=[BLANK]*ncol
             self.neighbors[row]=[BLANK]*ncol
             self.hidden[row]=[True]*ncol
+
+        self.checkIfValidSettings()
 
     def __str__(self):
         nrow=len(self.board)
@@ -62,9 +201,18 @@ class GameClass:
     def checkIfValidSettings(self):
         nrow=len(self.board)
         ncol=len(self.board[0])
-        if nrow*ncol>=self.nbomb:
+        if nrow*ncol<=self.nbomb:
             print "ERROR: There are too many bombs."
-            print "There are ", self.nrow*self.ncol, " squares and ", self.nbomb, " bombs."
+            print "There are", nrow, "rows and", ncol, "cols."
+            print "There are", nrow*ncol, "squares and", self.nbomb, "bombs."
+            return False
+
+        if nrow<2 or ncol<2 or self.nbomb<2:
+            print "ERROR: There must be at least two rows, columns, and bombs."
+            print "There are", nrow, "rows,", ncol, "cols, and", nbomb, "bombs."
+            return False
+
+        return True
 
     def getBoardCells(self):
         """
@@ -207,9 +355,11 @@ class GameClass:
             self.result=LOST
             return LOST
         else:
-            self.hidden[row][col]=False
-            if self.neighbors[row][col]==0:
-                self.revealSquares(row, col)
+            if self.hidden[row][col]:
+                self.nhidden-=1
+                self.hidden[row][col]=False
+                if self.neighbors[row][col]==0:
+                    self.revealSquares(row, col)
 
         if self.checkWin():
             self.result=WIN
@@ -230,66 +380,23 @@ def printIntro():
     """
     print intro
 
-def strToBool(s):
-    return s[0]=="Y" or s[0]=="y"
+def checkIfValidGame(nrow, ncol, nbomb):
+    if nrow*ncol<=nbomb:
+        print "ERROR: There are too many bombs."
+        print "There are", nrow, "rows and", ncol, "cols."
+        print "There are", nrow*ncol, "squares and", nbomb, "bombs."
+        return False
 
-def getSettings(nrow, ncol, nbomb):
-    print "The board has", nrow, "rows,", ncol, "columns, and", nbomb, "bombs."
-    change=raw_input("Would you like to change the settings? (Y/N) ")
-    if strToBool(change):
-        not_valid=True
-        while not_valid:
-            nrow=raw_input("How many rows would you like? ")
-            ncol=raw_input("How many cols would you like? ")
-            nbomb=raw_input("How many bombs would you like? ")
+    if nrow<2 or ncol<2 or nbomb<2:
+        print "ERROR: There must be at least two rows, columns, and bombs."
+        print "There are", nrow, "rows,", ncol, "cols, and", nbomb, "bombs."
+        return False
 
-            nrow=int(nrow)
-            ncol=int(ncol)
-            nbomb=int(nbomb)
+    return True
 
-            if nrow<=0 or ncol<=0 or nbomb<=0 or nbomb>=nrow*ncol:
-                print "You did not enter valid settings."
-            else:
-                not_valid=False
-
-    return (nrow, ncol, nbomb)
-
-def playGame(nrow, ncol, nbomb):
-    first_move=True
-    game=GameClass(nrow, ncol, nbomb)
-    while True:
-        print(game)
-
-        row=raw_input("Enter a row: ")
-        col=raw_input("Enter a column: ")
-
-        row=int(row)-1
-        col=int(col)-1
-
-        if first_move:
-            game.makeRandomBoard(row, col)
-            first_move=False
-        
-        result=game.makeMove(row, col)
-        if result==LOST:
-            print("You lost the game")
-            print(game)
-            break
-        if result==WIN:
-            print("You won the game")
-            print(game)
-            break
-
-nrow=9
-ncol=9
-nbomb=10
-
-printIntro()
-while True:
-    (nrow, ncol, nbomb)=getSettings(nrow, ncol, nbomb)
-    playGame(nrow, ncol, nbomb)
-    new_game=raw_input("Play again? (Y/N) ")
-    if not strToBool(new_game):
-        break
-
+if __name__=="__main__":
+    app=MainApp()
+    app.title('Minesweeper')
+    app.geometry('300x450')
+    app.mainloop()
     
