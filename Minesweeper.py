@@ -370,10 +370,8 @@ class GameClass:
 def printIntro():
     intro="""
     ********************************************************************
-    *This is an ASCII version of the classic Minesweeper game.         *
-    *"H" represents a hidden square. "." represents a cleared square.  *
-    *"*" represents a bomb. Digits 1-8 represent the number of bombs   *
-    *surrounding a square.                                             *
+    *This is the classic Minesweeper game.                             *
+    *Find all of the bombs using logic, without setting them off       *
     *                                                                  *
     *This game was made by Jouko Virtanen in 2018.                     *
     ********************************************************************
